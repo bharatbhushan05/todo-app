@@ -32,12 +32,11 @@ jobs:
     # 3. Secret Scanning inside repo & image (TRIVY SECRETS)
     # ------------------------
     - name: Scan repository for secrets (Trivy)
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: "repo"
-        scanners: "secret"
-        severity: "HIGH,CRITICAL"
-        exit-code: 1
+      run: |
+       trivy fs \
+        --scanners secret \
+        --severity HIGH,CRITICAL \
+        . | tee trivy-secret-scan.txt
 
     # ------------------------
     # 4. Set up Docker Buildx
@@ -98,13 +97,13 @@ jobs:
     # 8. Vulnerability Scan (TRIVY)
     # ------------------------
     - name: Scan Docker image with Trivy
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: "${{ secrets.DOCKERHUB_USERNAME }}/todo-app:${{ github.sha }}"
-        scan-type: image
-        format: table
-        severity: "HIGH,CRITICAL"
-        exit-code: 1
+      run: |
+        trivy image \
+          --severity HIGH,CRITICAL \
+          --format table \
+          --exit-code 1 \
+          ${{ secrets.DOCKERHUB_USERNAME }}/todo-app:${{ github.sha }} \
+          | tee trivy-image-scan.txt
 
     # ------------------------
     # 9. Push Image to  Docker Hub
