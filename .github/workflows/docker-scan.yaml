@@ -79,19 +79,19 @@ jobs:
     # ------------------------
     # 7. SBOM Generation (SYFT)
     # ------------------------
-    - name: Install Syft
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+    # - name: Install Syft
+    #   run: |
+    #     curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
 
-    - name: Generate SBOM (Syft)
-      run: |
-        syft scan-image:latest -o json > sbom.json
+    # - name: Generate SBOM (Syft)
+    #   run: |
+    #     syft scan-image:latest -o json > sbom.json
 
-    - name: Upload SBOM Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: sbom-report
-        path: sbom.json
+    # - name: Upload SBOM Artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: sbom-report
+    #     path: sbom.json
 
     # ------------------------
     # 8. Vulnerability Scan (TRIVY)
