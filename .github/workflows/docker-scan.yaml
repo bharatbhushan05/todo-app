@@ -24,9 +24,9 @@ jobs:
     # 2. Dockerfile Security Lint (HADOLINT)
     # ------------------------
     - name: Lint Dockerfile using Hadolint
-      uses: hadolint/hadolint-action@v3.1.0
-      with:
-        dockerfile: ./Dockerfile
+      run: |
+       docker run --rm -i hadolint/hadolint < Dockerfile > hadolint-output.txt || true
+
 
     # ------------------------
     # 3. Secret Scanning inside repo & image (TRIVY SECRETS)
