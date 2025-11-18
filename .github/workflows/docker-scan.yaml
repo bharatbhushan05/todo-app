@@ -132,22 +132,22 @@ jobs:
         echo "Generated on: $(date)" >> report.md
         echo "" >> report.md
         
-        echo "## 🛡️ Trivy Vulnerability Report" >> report.md
+        echo "##  Trivy Vulnerability Report" >> report.md
         echo '```' >> report.md
         cat trivy-image-scan.txt >> report.md
         echo '```' >> report.md
 
-        echo "## 🔑 Secret Scan Results (Trivy)" >> report.md
+        echo "##  Secret Scan Results (Trivy)" >> report.md
         echo '```' >> report.md
         cat trivy-secret-scan.txt >> report.md
         echo '```' >> report.md
 
-        echo "## 🧱 Dockerfile Linting (Hadolint)" >> report.md
+        echo "##  Dockerfile Linting (Hadolint)" >> report.md
         echo '```' >> report.md
         cat hadolint-output.txt >> report.md
         echo '```' >> report.md
 
-        echo "## 📦 SBOM Summary (Syft)" >> report.md
+        echo "##  SBOM Summary (Syft)" >> report.md
         echo '```' >> report.md
         cat sbom.json | jq '.artifacts | length' >> report.md
         echo 'packages detected.' >> report.md
