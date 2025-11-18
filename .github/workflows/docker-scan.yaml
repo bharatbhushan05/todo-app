@@ -1,0 +1,163 @@
+name: Secure Docker Build & Push
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write   # for cosign if you add signing later
+
+jobs:
+  build-and-secure:
+    runs-on: ubuntu-latest
+
+    steps:
+    # ------------------------
+    # 1. Checkout code
+    # ------------------------
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # ------------------------
+    # 2. Dockerfile Security Lint (HADOLINT)
+    # ------------------------
+    - name: Lint Dockerfile using Hadolint
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: ./Dockerfile
+
+    # ------------------------
+    # 3. Secret Scanning inside repo & image (TRIVY SECRETS)
+    # ------------------------
+    - name: Scan repository for secrets (Trivy)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: "repo"
+        scanners: "secret"
+        severity: "HIGH,CRITICAL"
+        exit-code: 1
+
+    # ------------------------
+    # 4. Set up Docker Buildx
+    # ------------------------
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # ------------------------
+    # OPTIONAL: Login to Docker Hub
+    # Uncomment this block for Docker Hub instead of GHCR
+    # ------------------------
+    # - name: Login to Docker Hub
+    #   uses: docker/login-action@v3
+    #   with:
+    #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+    #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # ------------------------
+    # 5. Login to GHCR (Registry-integrated scanning enabled)
+    # ------------------------
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # ------------------------
+    # 6. Build Docker Image
+    # ------------------------
+    - name: Build Docker Image
+      run: |
+        docker buildx build \
+          --platform linux/amd64 \
+          -t ghcr.io/${{ github.repository_owner }}/secure-app:${{ github.sha }} \
+          -t ghcr.io/${{ github.repository_owner }}/secure-app:latest \
+          .
+
+    # ------------------------
+    # 7. SBOM Generation (SYFT)
+    # ------------------------
+    - name: Generate SBOM (Syft)
+      uses: anchore/syft-action@v0.4.1
+      with:
+        image: "ghcr.io/${{ github.repository_owner }}/secure-app:${{ github.sha }}"
+        output: "sbom.json"
+
+    # Upload SBOM artifact
+    - name: Upload SBOM Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-report
+        path: sbom.json
+
+    # ------------------------
+    # 8. Vulnerability Scan (TRIVY)
+    # ------------------------
+    - name: Scan Docker image with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: "ghcr.io/${{ github.repository_owner }}/secure-app:${{ github.sha }}"
+        scan-type: image
+        format: table
+        severity: "HIGH,CRITICAL"
+        exit-code: 1
+
+    # ------------------------
+    # 9. Push Image to GHCR
+    # ------------------------
+    - name: Push Docker Image to GHCR
+      run: |
+        docker push ghcr.io/${{ github.repository_owner }}/secure-app:${{ github.sha }}
+        docker push ghcr.io/${{ github.repository_owner }}/secure-app:latest
+
+    # ------------------------
+    # 10. Registry-integrated scanning (AUTO)
+    # GHCR automatically scans the pushed images. No action needed.
+    # ------------------------
+
+    # ----------------------------------
+    # 11. Generate Combined PDF Security Report
+    # ----------------------------------
+    - name: Install pandoc & dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pandoc texlive texlive-latex-extra
+
+    - name: Create security report in Markdown
+      run: |
+        echo "# Docker Image Security Report" > report.md
+        echo "Generated on: $(date)" >> report.md
+        echo "" >> report.md
+        
+        echo "## 🛡️ Trivy Vulnerability Report" >> report.md
+        echo '```' >> report.md
+        cat trivy-image-scan.txt >> report.md
+        echo '```' >> report.md
+
+        echo "## 🔑 Secret Scan Results (Trivy)" >> report.md
+        echo '```' >> report.md
+        cat trivy-secret-scan.txt >> report.md
+        echo '```' >> report.md
+
+        echo "## 🧱 Dockerfile Linting (Hadolint)" >> report.md
+        echo '```' >> report.md
+        cat hadolint-output.txt >> report.md
+        echo '```' >> report.md
+
+        echo "## 📦 SBOM Summary (Syft)" >> report.md
+        echo '```' >> report.md
+        cat sbom.json | jq '.artifacts | length' >> report.md
+        echo 'packages detected.' >> report.md
+        echo '```' >> report.md
+
+    - name: Convert Markdown to PDF
+      run: |
+        pandoc report.md -o security-report.pdf
+
+    - name: Upload PDF Report Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-security-report
+        path: security-report.pdf
